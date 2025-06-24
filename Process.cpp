@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <sstream>
 #include <thread>
+#include <filesystem>
 
 Process::Process(const std::string& name, int totalLines)
     : name(name), totalLines(totalLines), currentLine(0), assignedCore(-1) {
@@ -12,7 +13,11 @@ Process::Process(const std::string& name, int totalLines)
 
 void Process::run(int coreId) {
     assignedCore = coreId;
-    std::ofstream log(name + ".txt", std::ios::app);
+
+    // Ensure the "processes" folder exists
+    std::filesystem::create_directory("processes");
+
+    std::ofstream log("processes/" + name + ".txt", std::ios::app);
 
     while (currentLine < totalLines) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10)); // simulate work
@@ -31,6 +36,7 @@ void Process::run(int coreId) {
 
     log.close();
 }
+
 
 const std::string& Process::getName() const {
     return name;
