@@ -61,7 +61,6 @@ void Scheduler::initialize(const std::string& configPath) {
 
 void Scheduler::start() {
     //TODO: Generate processes according to batch_process_freq in config.txt until scheduler.stop() is called
-    // must also configure scheduler to schedulerType
 
     // Create dummy processes (Only for FCFS HW, # of processes should be determined in config.txt)
     for (int i = 1; i <= 10; ++i) { // Creates 10 processes atm, must be changed to generate until stopped
@@ -107,9 +106,38 @@ void Scheduler::coreWorker(int coreId) {
 
             if (!running) return;
 
+            // Scheduler selection logic goes here
             if (!jobQueue.empty() && coreAvailable[coreId]) {
-                proc = jobQueue.front();
-                jobQueue.pop();
+				if (schedulerType == "sjf") {
+                    // Find the shortest job
+                    std::queue<std::shared_ptr<Process>> tempQueue;
+                    std::shared_ptr<Process> shortestJob = nullptr;
+
+                    while (!jobQueue.empty()) {
+                        auto current = jobQueue.front();
+                        jobQueue.pop();
+                        if (!shortestJob || current->getTotalLines() < shortestJob->getTotalLines()) {
+                            if (shortestJob) tempQueue.push(shortestJob);
+                            shortestJob = current;
+                        }
+                        else {
+                            tempQueue.push(current);
+                        }
+                    }
+
+                    // Restore remaining processes
+                    jobQueue = tempQueue;
+                    proc = shortestJob;
+                }
+				else if (schedulerType == "fcfs") { 
+                    proc = jobQueue.front();
+                    jobQueue.pop();
+                }
+                else {
+					//Default to Round Robin (rr) given quantumCycles
+
+                }
+
                 coreAvailable[coreId] = false;
                 runningProcesses[proc->getName()] = proc;
             }
