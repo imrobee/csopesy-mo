@@ -112,6 +112,9 @@ void enterMainLoop() {
             }
         }
         else {
+            if (command == "view-config") {
+                scheduler.viewConfig();
+            }
             if (command == "initialize") {
                 initializeEmulator();
             }
@@ -139,6 +142,9 @@ void enterMainLoop() {
             }
             else if (command == "clear") { // Clears the screen
                 clearScreen();
+            }
+            else if (command.empty()) {
+                continue;
             }
             else {
                 std::cout << "Unrecognized command.\n";

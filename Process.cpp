@@ -17,7 +17,7 @@ void Process::run(int coreId) {
     // Ensure the "processes" folder exists
     std::filesystem::create_directory("processes");
 
-    std::ofstream log("processes/" + name + ".txt", std::ios::app);
+    std::ofstream log(name + ".txt", std::ios::app);
 
     while (currentLine < totalLines) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10)); // simulate work
@@ -31,6 +31,25 @@ void Process::run(int coreId) {
                 log << "(" << timeStr << ") Core: " << coreId
                     << "  \"Hello world from " << name << "!\"\n";
             }
+        }
+    }
+
+    log.close();
+}
+
+void Process::run(int coreId, int quantumCycles) {
+    assignedCore = coreId;
+
+    std::ofstream log(name + ".txt", std::ios::app);
+    int executed = 0;
+
+    while (currentLine < totalLines && executed < quantumCycles) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));  // Simulate execution
+        ++currentLine;
+        ++executed;
+
+        if (log.is_open()) {
+            log << "Executed line " << currentLine << " on core " << coreId << "\n";
         }
     }
 

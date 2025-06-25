@@ -25,6 +25,10 @@ void Scheduler::initialize(const std::string& configPath) {
 
     std::string line;
     while (std::getline(config, line)) {
+        // Trim leading/trailing whitespace
+        line.erase(0, line.find_first_not_of(" \t\r\n"));
+        line.erase(line.find_last_not_of(" \t\r\n") + 1);
+
         std::istringstream iss(line);
         std::string key;
         iss >> key;
@@ -32,7 +36,7 @@ void Scheduler::initialize(const std::string& configPath) {
         if (key == "num-cpu") {
             iss >> numCores;
         }
-        else if (key == "scheduler") { //options: fcfs, rr, sjf
+        else if (key == "scheduler") {
             iss >> schedulerType;
         }
         else if (key == "quantum-cycles") {
@@ -52,18 +56,24 @@ void Scheduler::initialize(const std::string& configPath) {
         }
     }
 
-    //test if values r being overwritten
-    /*std::cout << numCores;
-    std::cout << schedulerType;
-    std::cout << quantumCycles;*/
+	// Remove quotes from schedulerType if present
+    if (!schedulerType.empty() && schedulerType.front() == '"' && schedulerType.back() == '"') {
+        schedulerType = schedulerType.substr(1, schedulerType.size() - 2);
+    }
 
 }
 
-void Scheduler::start() {
-    //TODO: Generate processes according to batch_process_freq in config.txt until scheduler.stop() is called
 
-    // Create dummy processes (Only for FCFS HW, # of processes should be determined in config.txt)
-    for (int i = 1; i <= 10; ++i) { // Creates 10 processes atm, must be changed to generate until stopped
+void Scheduler::start() {
+    running = true;
+
+    coreAvailable.resize(numCores, true);
+    for (int i = 0; i < numCores; ++i) {
+        cores.emplace_back(&Scheduler::coreWorker, this, i);
+    }
+
+    // Now push processes
+    for (int i = 1; i <= 10; ++i) {
         std::ostringstream name;
         name << "Process_" << std::setw(2) << std::setfill('0') << i;
         auto process = std::make_shared<Process>(name.str(), 100);
@@ -73,14 +83,11 @@ void Scheduler::start() {
         }
     }
 
-    running = true;
+    cv.notify_all();
 
-    coreAvailable.resize(numCores, true);
-    for (int i = 0; i < numCores; ++i) {
-        cores.emplace_back(&Scheduler::coreWorker, this, i);
-    }
     std::thread(&Scheduler::dispatcher, this).detach();
 }
+
 
 void Scheduler::stop() {
     // TODO: Stop scheduler.start() from generating processes
@@ -108,34 +115,12 @@ void Scheduler::coreWorker(int coreId) {
 
             // Scheduler selection logic goes here
             if (!jobQueue.empty() && coreAvailable[coreId]) {
-				if (schedulerType == "sjf") {
-                    // Find the shortest job
-                    std::queue<std::shared_ptr<Process>> tempQueue;
-                    std::shared_ptr<Process> shortestJob = nullptr;
-
-                    while (!jobQueue.empty()) {
-                        auto current = jobQueue.front();
-                        jobQueue.pop();
-                        if (!shortestJob || current->getTotalLines() < shortestJob->getTotalLines()) {
-                            if (shortestJob) tempQueue.push(shortestJob);
-                            shortestJob = current;
-                        }
-                        else {
-                            tempQueue.push(current);
-                        }
-                    }
-
-                    // Restore remaining processes
-                    jobQueue = tempQueue;
-                    proc = shortestJob;
-                }
-				else if (schedulerType == "fcfs") { 
+				if (schedulerType == "fcfs" or schedulerType == "rr") { //Round Robin is just fcfs with quantum cycles*
                     proc = jobQueue.front();
                     jobQueue.pop();
                 }
                 else {
-					//Default to Round Robin (rr) given quantumCycles
-
+					std::cerr << "Unsupported scheduler: " << schedulerType << "\n";
                 }
 
                 coreAvailable[coreId] = false;
@@ -144,7 +129,12 @@ void Scheduler::coreWorker(int coreId) {
         }
 
         if (proc) {
-            proc->run(coreId);
+            if (schedulerType == "rr") {
+                proc->run(coreId, quantumCycles);
+            }
+            else {
+                proc->run(coreId);
+            }
 
             {
                 std::lock_guard<std::mutex> lock(queueMutex);
@@ -219,4 +209,15 @@ void Scheduler::writeStatusToFile() {
     outFile.close();
 
     std::cout << "Report generated at csopesy-log.txt\n";
+}
+
+void Scheduler::viewConfig() {
+    std::cout << "Current Scheduler Configuration:\n";
+    std::cout << "Number of Cores: " << numCores << "\n";
+    std::cout << "Scheduler Type: " << schedulerType << "\n";
+    std::cout << "Quantum Cycles: " << quantumCycles << "\n";
+    std::cout << "Batch Process Frequency: " << batchFrequency << "\n";
+    std::cout << "Min Instructions: " << minInstructions << "\n";
+    std::cout << "Max Instructions: " << maxInstructions << "\n";
+	std::cout << "Delay Per Execution: " << delayPerExecution << "\n";
 }

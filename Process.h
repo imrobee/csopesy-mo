@@ -9,6 +9,7 @@ public:
     Process(const std::string& name, int totalLines);
 
     void run(int coreId);
+	void run(int coreId, int quantumCycles); // For Round Robin scheduling
 
     const std::string& getName() const;
     int getCurrentLine() const;

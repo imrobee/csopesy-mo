@@ -21,6 +21,7 @@ public:
     void stop();
     void printStatus();
     void writeStatusToFile();
+	void viewConfig();
 
 private:
     // configs defined in config.txt
