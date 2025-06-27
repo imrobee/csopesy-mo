@@ -1,30 +1,33 @@
-#ifndef SCHEDULER_H
-#define SCHEDULER_H
-
+#pragma once
+#include "Process.h"
+#include <thread>
 #include <vector>
 #include <queue>
-#include <thread>
-#include <atomic>
+#include <map>
 #include <mutex>
 #include <condition_variable>
 #include <string>
-#include <map>
 #include <memory>
-#include "Process.h"
+#include <atomic>
 
 class Scheduler {
 public:
     Scheduler();
-
     void initialize(const std::string& configPath);
-    void start();
-    void stop();
+    void start();           
+    void stop();          
+    void dispatcher();       
+    void coreWorker(int coreId);
     void printStatus();
     void writeStatusToFile();
-	void viewConfig();
+    void viewConfig();
+    void createManualProcess(const std::string& processName);
+
+
+    std::map<std::string, std::shared_ptr<Process>> runningProcesses;
+    std::map<std::string, std::shared_ptr<Process>> finishedProcesses;
 
 private:
-    // configs defined in config.txt
     int numCores;
     std::string schedulerType;
     int quantumCycles;
@@ -33,20 +36,19 @@ private:
     int maxInstructions;
     int delayPerExecution;
 
-    // others
-    std::vector<std::thread> cores;
-    std::vector<bool> coreAvailable;
     std::atomic<bool> running;
 
-    std::queue<std::shared_ptr<Process>> jobQueue;
-    std::map<std::string, std::shared_ptr<Process>> runningProcesses;
-    std::map<std::string, std::shared_ptr<Process>> finishedProcesses;
+    std::vector<std::thread> cores;   
+    std::thread dispatcherThread;         
+
+    std::vector<bool> coreAvailable; 
+
+    std::queue<std::shared_ptr<Process>> readyQueue;   
+    
 
     std::mutex queueMutex;
     std::condition_variable cv;
 
-    void dispatcher();
-    void coreWorker(int coreId);
-};
+    std::vector<Instruction> generateDummyInstructions(int count);
 
-#endif
+};

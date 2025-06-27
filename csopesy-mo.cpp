@@ -40,6 +40,7 @@ void initializeEmulator() {
     scheduler.initialize("config.txt");
 }
 
+
 void startScheduler() {
     // Generates processes and inserts them into ready queue
     std::cout << "Scheduler-start command recognized. Starting scheduler...\n";
@@ -53,26 +54,98 @@ void stopScheduler() {
 }
 
 void startProcess(std::string command) {
-    // Note: this function should clear the screen and not print the header
-    system("cls");
-    // TODO: Implement process creation logic
+	system("cls"); // Clear the screen
+
+    std::string processName = command.substr(9);
+    scheduler.createManualProcess(processName);
+
+    std::cout << "Attached to newly created process: " << processName << "\n";
+
+    while (true) {
+        std::cout << "(" << processName << ")> ";
+        std::string subCommand;
+        std::getline(std::cin, subCommand);
+
+        auto it = scheduler.runningProcesses.find(processName);
+        if (it == scheduler.runningProcesses.end()) {
+            std::cout << "Process has finished!\n";
+            break;
+        }
+
+        auto process = it->second;
+
+        if (subCommand == "process-smi") {
+            auto logs = process->getLogs();
+            std::cout << "Process ID: " << processName << "\n";
+            std::cout << "Assigned core: " << process->getAssignedCore() << "\n";
+            std::cout << "Logs:\n";
+            for (const auto& log : logs) {
+                std::cout << log << "\n";
+            }
+
+            if (process->getCurrentLine() == process->getTotalLines()) {
+                std::cout << "Finished!\n";
+            }
+            else {
+                std::cout << "Instruction: " << process->getCurrentLine() << " / " << process->getTotalLines() << "\n";
+            }
+        }
+        else if (subCommand == "exit") {
+            std::cout << "Returning to main menu...\n";
+            break;
+        }
+        else {
+            std::cout << "Unknown command inside process screen.\n";
+        }
+    }
 }
 
-void readProcess(std::string command) {
-    std::string name = command.substr(10);
-    std::ifstream log(name + ".txt"); // Update when processes shouldnt generate .txt files anymore
-    if (log.is_open()) {
-        std::cout << "Process name: " << name << "\nLogs:\n";
-        std::string line;
-        while (std::getline(log, line)) {
-            std::cout << line << "\n";
+
+
+void readProcess(const std::string& command) {
+
+    std::string processName = command.substr(10);
+
+    auto it = scheduler.runningProcesses.find(processName);
+    if (it != scheduler.runningProcesses.end()) {
+        auto process = it->second;
+        std::cout << "Attached to process: " << processName << "\n";
+
+        while (true) {
+            std::cout << "(" << processName << ")> ";
+            std::string subCommand;
+            std::getline(std::cin, subCommand);
+
+            if (subCommand == "process-smi") {
+                auto logs = process->getLogs();
+                std::cout << "Process name: " << processName << "\n";
+                std::cout << "Assigned core: " << process->getAssignedCore() << "\n";               
+                std::cout << "Logs:\n";
+                for (const auto& log : logs) {
+                    std::cout << log << "\n";
+                }
+
+                if (process->getCurrentLine() == process->getTotalLines()) {
+                    std::cout << "Finished!\n";
+                }
+                else {
+                    std::cout << "Instruction: " << process->getCurrentLine() << " / " << process->getTotalLines() << "\n";
+                }
+            }
+            else if (subCommand == "exit") {
+                std::cout << "Returning to main menu...\n";
+                break;
+            }
+            else {
+                std::cout << "Unknown command inside process screen.\n";
+            }
         }
-        log.close();
     }
     else {
-        std::cout << "Process " << name << " not found.\n"; // Should not be able to see processes that don't exist/are not finished
+        std::cout << "Process " << processName << " not found or has finished.\n";
     }
 }
+
 
 //A main menu console for recognizing the following commands : 
 //“initialize” – initialize the processor configuration of the application. This must be called before any other command could be recognized, aside from “exit”.
@@ -115,7 +188,7 @@ void enterMainLoop() {
             if (command == "view-config") {
                 scheduler.viewConfig();
             }
-            if (command == "initialize") {
+            else if (command == "initialize") {
                 initializeEmulator();
             }
             else if (command == "exit") {
@@ -123,10 +196,12 @@ void enterMainLoop() {
                 break;
             }
             else if (command.rfind("screen -s ", 0) == 0) { // "Start Process"
-				startProcess(command);
+                startProcess(command);
+				clearScreen();
             }
             else if (command.rfind("screen -r ", 0) == 0) { // "Read Process"
                 readProcess(command);
+                clearScreen();
             }
             else if (command == "screen -ls") { // "List all processes"
                 scheduler.printStatus();

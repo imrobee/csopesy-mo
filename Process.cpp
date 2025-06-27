@@ -1,90 +1,127 @@
 #include "Process.h"
-#include <fstream>
 #include <chrono>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 #include <thread>
-#include <filesystem>
+#include <atomic>
 
-Process::Process(const std::string& name, int totalLines)
-    : name(name), totalLines(totalLines), currentLine(0), assignedCore(-1) {
-    timestamp = getCurrentTimestamp();
-}
+#include <algorithm>
 
-void Process::run(int coreId) {
-    assignedCore = coreId;
-
-    // Ensure the "processes" folder exists
-    std::filesystem::create_directory("processes");
-
-    std::ofstream log(name + ".txt", std::ios::app);
-
-    while (currentLine < totalLines) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10)); // simulate work
-
-        std::string timeStr = getCurrentTimestamp();
-
-        {
-            std::lock_guard<std::mutex> lock(mtx);
-            ++currentLine;
-            if (log.is_open()) {
-                log << "(" << timeStr << ") Core: " << coreId
-                    << "  \"Hello world from " << name << "!\"\n";
-            }
-        }
-    }
-
-    log.close();
-}
-
-void Process::run(int coreId, int quantumCycles) {
-    assignedCore = coreId;
-
-    std::ofstream log(name + ".txt", std::ios::app);
-    int executed = 0;
-
-    while (currentLine < totalLines && executed < quantumCycles) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));  // Simulate execution
-        ++currentLine;
-        ++executed;
-
-        if (log.is_open()) {
-            log << "Executed line " << currentLine << " on core " << coreId << "\n";
-        }
-    }
-
-    log.close();
-}
-
-
-const std::string& Process::getName() const {
-    return name;
-}
-
-int Process::getCurrentLine() const {
-    return currentLine;
-}
-
-int Process::getTotalLines() const {
-    return totalLines;
-}
-
-int Process::getAssignedCore() const {
-    return assignedCore;
+Process::Process(const std::string& name, const std::vector<Instruction>& instructions)
+    : name(name), instructions(instructions), currentLine(0), assignedCore(-1) {
 }
 
 std::string Process::getTimestamp() const {
-    return timestamp;
-}
-
-std::string Process::getCurrentTimestamp() const {
     auto now = std::chrono::system_clock::now();
-    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
-    std::tm parts;
-
-    localtime_s(&parts, &now_c);
-
+    auto t = std::chrono::system_clock::to_time_t(now);
+    std::tm buf{};
+#ifdef _WIN32
+    localtime_s(&buf, &t);
+#else
+    localtime_r(&t, &buf);
+#endif
     std::ostringstream oss;
-    oss << std::put_time(&parts, "%m/%d/%Y %I:%M:%S%p");
+    oss << std::put_time(&buf, "%m/%d/%Y %H:%M:%S");
     return oss.str();
 }
+
+// Runs the process; ends when stops running so scheduler.stop() doesn't need to wait for it
+void Process::run(int coreId, int delayPerExecution, int quantum, std::atomic<bool>& running) {
+    assignedCore = coreId;
+    int cycles = 0;
+
+    while (currentLine < instructions.size()) {
+        if (!running) break;
+
+        executeInstruction(instructions[currentLine]);
+        ++currentLine;
+        ++cycles;
+
+        if (delayPerExecution > 0) {
+            for (uint32_t d = 0; d < delayPerExecution; ++d) {
+                // doing nothing to implement busy-wait scheme
+            }
+        }
+
+
+        if (quantum > 0 && cycles >= quantum) break;
+    }
+}
+
+// Executes a single instruction and logs the action. Log can then be retrieved for "screen" commands
+void Process::executeInstruction(const Instruction& ins) {
+    std::ostringstream entry;
+    entry << "[" << getTimestamp() << "] ";
+
+    switch (ins.type) {
+    case InstructionType::PRINT:
+        entry << "PRINT: Hello world from " << name << "!";
+        logs.push_back(entry.str());
+        break;
+
+    case InstructionType::DECLARE:
+        if (ins.args.size() >= 2) {
+            memory[ins.args[0]] = static_cast<uint16_t>(std::stoi(ins.args[1]));
+            entry << "DECLARE: " << ins.args[0] << " = " << ins.args[1];
+            logs.push_back(entry.str());
+        }
+        break;
+
+    case InstructionType::ADD:
+        if (ins.args.size() >= 3) {
+            int sum = getValue(ins.args[1]) + getValue(ins.args[2]);
+            sum = std::clamp(sum, 0, static_cast<int>(UINT16_MAX));
+            memory[ins.args[0]] = static_cast<uint16_t>(sum);
+            entry << "ADD: " << ins.args[0] << " = " << ins.args[1] << " + " << ins.args[2]
+                << " -> " << sum;
+            logs.push_back(entry.str());
+        }
+        break;
+
+    case InstructionType::SUBTRACT:
+        if (ins.args.size() >= 3) {
+            int diff = getValue(ins.args[1]) - getValue(ins.args[2]);
+            diff = std::clamp(diff, 0, static_cast<int>(UINT16_MAX));
+            memory[ins.args[0]] = static_cast<uint16_t>(diff);
+            entry << "SUBTRACT: " << ins.args[0] << " = " << ins.args[1] << " - " << ins.args[2]
+                << " -> " << diff;
+            logs.push_back(entry.str());
+        }
+        break;
+
+    case InstructionType::SLEEP:
+        if (!ins.args.empty()) {
+            entry << "SLEEP: " << ins.args[0] << " ticks";
+            logs.push_back(entry.str());
+            std::this_thread::sleep_for(std::chrono::milliseconds(std::stoi(ins.args[0]) * 10));
+        }
+        break;
+
+    /*case InstructionType::FOR:
+        entry << "FOR: repeat " << ins.repeatCount << " times";
+        logs.push_back(entry.str());
+        for (int i = 0; i < ins.repeatCount; ++i) {
+            for (const auto& subIns : ins.body) {
+                executeInstruction(subIns);
+            }
+        }
+        break;*/
+
+    default:
+        break;
+    }
+}
+
+
+// Retrieves the numeric value of an argument, checking memory first; otherwise converts string to integer.
+uint16_t Process::getValue(const std::string& arg) {
+    if (memory.count(arg)) return memory[arg];
+    return static_cast<uint16_t>(std::stoi(arg));
+}
+
+std::string Process::getName() const { return name; }
+int Process::getAssignedCore() const { return assignedCore; }
+int Process::getCurrentLine() const { return currentLine; }
+int Process::getTotalLines() const { return static_cast<int>(instructions.size()); }
+

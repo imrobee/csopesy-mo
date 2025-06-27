@@ -1,31 +1,33 @@
-#ifndef PROCESS_H
-#define PROCESS_H
-
+#pragma once
 #include <string>
-#include <mutex>
+#include <vector>
+#include <unordered_map>
+#include <atomic>
+#include "Instruction.h"
 
 class Process {
 public:
-    Process(const std::string& name, int totalLines);
+    Process(const std::string& name, const std::vector<Instruction>& instructions);
 
-    void run(int coreId);
-	void run(int coreId, int quantumCycles); // For Round Robin scheduling
-
-    const std::string& getName() const;
+    void run(int coreId, int delayPerExecution, int quantum, std::atomic<bool>& running); // quantum = 0 for fcfs, >0 for round-robin
+    std::string getTimestamp() const;
+    std::string getName() const;
+    int getAssignedCore() const;
     int getCurrentLine() const;
     int getTotalLines() const;
-    int getAssignedCore() const;
-    std::string getTimestamp() const;
 
+    std::vector<std::string> getLogs() const { return logs; }
 private:
+    std::vector<std::string> logs;
+
     std::string name;
-    int totalLines;
+    std::vector<Instruction> instructions;
+    std::unordered_map<std::string, uint16_t> memory;
     int currentLine;
     int assignedCore;
-    std::string timestamp;
-    std::mutex mtx;
 
-    std::string getCurrentTimestamp() const;
+    void executeInstruction(const Instruction& ins);
+    uint16_t getValue(const std::string& arg);
+    
+
 };
-
-#endif

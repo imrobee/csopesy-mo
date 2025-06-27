@@ -5,15 +5,16 @@
 #include <iomanip>
 #include <chrono>
 #include <ctime>
+#include <cstdlib> // for rand()
 
 Scheduler::Scheduler() : numCores(4),
-                            schedulerType("rr"),
-                            quantumCycles(5),
-                            batchFrequency(1),
-                            minInstructions(1000),
-                            maxInstructions(2000),
-                            delayPerExecution(0),
-                            running(false) {
+schedulerType("rr"),
+quantumCycles(5),
+batchFrequency(1),
+minInstructions(1000),
+maxInstructions(2000),
+delayPerExecution(0),
+running(false) {
 }
 
 void Scheduler::initialize(const std::string& configPath) {
@@ -56,7 +57,7 @@ void Scheduler::initialize(const std::string& configPath) {
         }
     }
 
-	// Remove quotes from schedulerType if present
+    // Remove quotes from schedulerType so == can compare properly
     if (!schedulerType.empty() && schedulerType.front() == '"' && schedulerType.back() == '"') {
         schedulerType = schedulerType.substr(1, schedulerType.size() - 2);
     }
@@ -68,38 +69,101 @@ void Scheduler::start() {
     running = true;
 
     coreAvailable.resize(numCores, true);
+
+    // Start core worker threads
     for (int i = 0; i < numCores; ++i) {
         cores.emplace_back(&Scheduler::coreWorker, this, i);
     }
 
-    // Now push processes
-    for (int i = 1; i <= 10; ++i) {
-        std::ostringstream name;
-        name << "Process_" << std::setw(2) << std::setfill('0') << i;
-        auto process = std::make_shared<Process>(name.str(), 100);
-        {
-            std::lock_guard<std::mutex> lock(queueMutex);
-            jobQueue.push(process);
+    // Start dispatcher thread (responsible for pushing dummy processes at batchFrequency)
+    dispatcherThread = std::thread(&Scheduler::dispatcher, this);
+}
+
+void Scheduler::stop() {
+    running = false;
+
+    // Notify all waiting threads to wake up
+    cv.notify_all();
+
+    // Wait for dispatcher to finish
+    if (dispatcherThread.joinable()) {
+        dispatcherThread.join();
+    }
+
+    // Wait for core workers to finish
+    for (auto& t : cores) {
+        if (t.joinable()) t.join();
+    }
+
+    std::cout << "Scheduler stopped.\n";
+}
+
+
+
+std::vector<Instruction> Scheduler::generateDummyInstructions(int count) {
+    std::vector<Instruction> instructions;
+
+    //should b able to randomly select an instruction  
+    for (int i = 0; i < count; ++i) {
+        int choice = rand() % 5;
+
+        switch (choice) {
+        case 0: // PRINT
+            instructions.emplace_back(InstructionType::PRINT);
+            break;
+        case 1: // DECLARE
+            instructions.emplace_back(InstructionType::DECLARE, std::vector<std::string>{"var" + std::to_string(i), "10"});
+            break;
+        case 2: // ADD
+            instructions.emplace_back(InstructionType::ADD, std::vector<std::string>{"var" + std::to_string(i), "1", "2"});
+            break;
+        case 3: // SUBTRACT
+            instructions.emplace_back(InstructionType::SUBTRACT, std::vector<std::string>{"var" + std::to_string(i), "5", "3"});
+            break;
+        case 4: // SLEEP
+            instructions.emplace_back(InstructionType::SLEEP, std::vector<std::string>{"1"});
+            break;
+
+        //case 5: // FOR
+        //    instructions.emplace_back(InstructionType::FOR, std::vector<std::string>{"i", "0", "10"});
+        //    break;
         }
     }
 
-    cv.notify_all();
-
-    std::thread(&Scheduler::dispatcher, this).detach();
+    return instructions;
 }
 
-
-void Scheduler::stop() {
-    // TODO: Stop scheduler.start() from generating processes
-}
 
 void Scheduler::dispatcher() {
+    int processCounter = 1;
+
     while (running) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        std::unique_lock<std::mutex> lock(queueMutex);
-        cv.notify_all();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Simulate a CPU tick
+
+        // Only add a process every batchFrequency ticks
+        if (processCounter % batchFrequency == 0) {
+            std::ostringstream name;
+            name << "Process_" << std::setw(2) << std::setfill('0') << processCounter;
+
+            int numInstructions = minInstructions;
+            if (maxInstructions > minInstructions) {
+                numInstructions += rand() % (maxInstructions - minInstructions + 1);
+            }
+
+            auto instructions = generateDummyInstructions(numInstructions);
+            auto process = std::make_shared<Process>(name.str(), instructions);
+
+            {
+                std::lock_guard<std::mutex> lock(queueMutex);
+                readyQueue.push(process);
+            }
+            cv.notify_all();
+        }
+
+        ++processCounter;
     }
 }
+
 
 void Scheduler::coreWorker(int coreId) {
     while (running) {
@@ -108,19 +172,19 @@ void Scheduler::coreWorker(int coreId) {
         {
             std::unique_lock<std::mutex> lock(queueMutex);
             cv.wait(lock, [&] {
-                return !jobQueue.empty() || !running;
+                return !readyQueue.empty() || !running;
                 });
 
             if (!running) return;
 
             // Scheduler selection logic goes here
-            if (!jobQueue.empty() && coreAvailable[coreId]) {
-				if (schedulerType == "fcfs" or schedulerType == "rr") { //Round Robin is just fcfs with quantum cycles*
-                    proc = jobQueue.front();
-                    jobQueue.pop();
+            if (!readyQueue.empty() && coreAvailable[coreId]) {
+                if (schedulerType == "fcfs" or schedulerType == "rr") { //Round Robin is just fcfs with quantum cycles*
+                    proc = readyQueue.front();
+                    readyQueue.pop();
                 }
                 else {
-					std::cerr << "Unsupported scheduler: " << schedulerType << "\n";
+                    std::cerr << "Unsupported scheduler: " << schedulerType << "\n";
                 }
 
                 coreAvailable[coreId] = false;
@@ -130,10 +194,10 @@ void Scheduler::coreWorker(int coreId) {
 
         if (proc) {
             if (schedulerType == "rr") {
-                proc->run(coreId, quantumCycles);
+                proc->run(coreId, delayPerExecution, quantumCycles, running);
             }
             else {
-                proc->run(coreId);
+                proc->run(coreId, delayPerExecution, 0, running);
             }
 
             {
@@ -219,5 +283,23 @@ void Scheduler::viewConfig() {
     std::cout << "Batch Process Frequency: " << batchFrequency << "\n";
     std::cout << "Min Instructions: " << minInstructions << "\n";
     std::cout << "Max Instructions: " << maxInstructions << "\n";
-	std::cout << "Delay Per Execution: " << delayPerExecution << "\n";
+    std::cout << "Delay Per Execution: " << delayPerExecution << "\n";
+}
+
+void Scheduler::createManualProcess(const std::string& processName) {
+    int numInstructions = minInstructions;
+    if (maxInstructions > minInstructions) {
+        numInstructions += rand() % (maxInstructions - minInstructions + 1);
+    }
+
+    auto instructions = generateDummyInstructions(numInstructions);
+    auto process = std::make_shared<Process>(processName, instructions);
+
+    {
+        std::lock_guard<std::mutex> lock(queueMutex);
+        readyQueue.push(process);
+    }
+    cv.notify_all();
+
+    std::cout << "Manual process " << processName << " created and added to the queue.\n";
 }

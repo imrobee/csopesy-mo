@@ -129,6 +129,7 @@
     <ClCompile Include="Scheduler.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Instruction.h" />
     <ClInclude Include="Process.h" />
     <ClInclude Include="Scheduler.h" />
   </ItemGroup>
