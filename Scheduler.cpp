@@ -64,7 +64,7 @@ void Scheduler::initialize(const std::string& configPath) {
 
 }
 
-
+// Starts the scheduler: spawns core worker threads and the dispatcher thread.
 void Scheduler::start() {
     running = true;
 
@@ -82,7 +82,6 @@ void Scheduler::start() {
 void Scheduler::stop() {
     running = false;
 
-    // Notify all waiting threads to wake up
     cv.notify_all();
 
     // Wait for dispatcher to finish
@@ -123,27 +122,36 @@ std::vector<Instruction> Scheduler::generateDummyInstructions(int count) {
         case 4: // SLEEP
             instructions.emplace_back(InstructionType::SLEEP, std::vector<std::string>{"1"});
             break;
-
-        //case 5: // FOR
-        //    instructions.emplace_back(InstructionType::FOR, std::vector<std::string>{"i", "0", "10"});
+        //case 5: { // FOR loop
+        //    int repeats = 2 + rand() % 3; // repeat 2–4 times
+        //    int bodySize = 2 + rand() % 3; // body has 2–4 instructions
+        //    auto body = generateDummyInstructions(bodySize);
+        //    Instruction forIns(InstructionType::FOR);
+        //    forIns.repeatCount = repeats;
+        //    forIns.body = body;
+        //    instructions.push_back(forIns);
         //    break;
+        //}
         }
     }
 
     return instructions;
 }
 
-
+// Periodically creates new dummy processes at batchFrequency and adds them to the queue.
 void Scheduler::dispatcher() {
-    int processCounter = 1;
+    int processCounter = 0;
 
     while (running) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Simulate a CPU tick
 
         // Only add a process every batchFrequency ticks
         if (processCounter % batchFrequency == 0) {
+            int pid = nextProcessId++;  // increment once
             std::ostringstream name;
-            name << "Process_" << std::setw(2) << std::setfill('0') << processCounter;
+            name << "Process_" << std::setw(2) << std::setfill('0') << pid;
+
+
 
             int numInstructions = minInstructions;
             if (maxInstructions > minInstructions) {
@@ -151,7 +159,8 @@ void Scheduler::dispatcher() {
             }
 
             auto instructions = generateDummyInstructions(numInstructions);
-            auto process = std::make_shared<Process>(name.str(), instructions);
+            auto process = std::make_shared<Process>(pid, name.str(), instructions);
+
 
             {
                 std::lock_guard<std::mutex> lock(queueMutex);
@@ -164,7 +173,7 @@ void Scheduler::dispatcher() {
     }
 }
 
-
+// Continuously picks processes from the queue and runs them on the assigned core.
 void Scheduler::coreWorker(int coreId) {
     while (running) {
         std::shared_ptr<Process> proc = nullptr;
@@ -286,20 +295,20 @@ void Scheduler::viewConfig() {
     std::cout << "Delay Per Execution: " << delayPerExecution << "\n";
 }
 
-void Scheduler::createManualProcess(const std::string& processName) {
-    int numInstructions = minInstructions;
-    if (maxInstructions > minInstructions) {
-        numInstructions += rand() % (maxInstructions - minInstructions + 1);
-    }
-
-    auto instructions = generateDummyInstructions(numInstructions);
-    auto process = std::make_shared<Process>(processName, instructions);
-
-    {
-        std::lock_guard<std::mutex> lock(queueMutex);
-        readyQueue.push(process);
-    }
-    cv.notify_all();
-
-    std::cout << "Manual process " << processName << " created and added to the queue.\n";
-}
+//void Scheduler::createManualProcess(const std::string& processName) {
+//    int numInstructions = minInstructions;
+//    if (maxInstructions > minInstructions) {
+//        numInstructions += rand() % (maxInstructions - minInstructions + 1);
+//    }
+//
+//    auto instructions = generateDummyInstructions(numInstructions);
+//    auto process = std::make_shared<Process>(processName, instructions);
+//
+//    {
+//        std::lock_guard<std::mutex> lock(queueMutex);
+//        readyQueue.push(process);
+//    }
+//    cv.notify_all();
+//
+//    std::cout << "Process " << processName << " created and added to the queue.\n";
+//}

@@ -53,64 +53,42 @@ void stopScheduler() {
     scheduler.stop();
 }
 
-void startProcess(std::string command) {
-	system("cls"); // Clear the screen
+void attachToProcess(const std::string& command) {
+    std::string processName = command.substr(10); // skip "screen -s "
 
-    std::string processName = command.substr(9);
-    scheduler.createManualProcess(processName);
-
-    std::cout << "Attached to newly created process: " << processName << "\n";
-
-    while (true) {
-        std::cout << "(" << processName << ")> ";
-        std::string subCommand;
-        std::getline(std::cin, subCommand);
-
-        auto it = scheduler.runningProcesses.find(processName);
-        if (it == scheduler.runningProcesses.end()) {
-            std::cout << "Process has finished!\n";
-            break;
-        }
-
-        auto process = it->second;
-
-        if (subCommand == "process-smi") {
-            auto logs = process->getLogs();
-            std::cout << "Process ID: " << processName << "\n";
-            std::cout << "Assigned core: " << process->getAssignedCore() << "\n";
-            std::cout << "Logs:\n";
-            for (const auto& log : logs) {
-                std::cout << log << "\n";
-            }
-
-            if (process->getCurrentLine() == process->getTotalLines()) {
-                std::cout << "Finished!\n";
-            }
-            else {
-                std::cout << "Instruction: " << process->getCurrentLine() << " / " << process->getTotalLines() << "\n";
-            }
-        }
-        else if (subCommand == "exit") {
-            std::cout << "Returning to main menu...\n";
-            break;
-        }
-        else {
-            std::cout << "Unknown command inside process screen.\n";
+    std::shared_ptr<Process> process = nullptr;
+    auto itRunning = scheduler.runningProcesses.find(processName);
+    if (itRunning != scheduler.runningProcesses.end()) {
+        process = itRunning->second;
+    }
+    else {
+        auto itFinished = scheduler.finishedProcesses.find(processName);
+        if (itFinished != scheduler.finishedProcesses.end()) {
+            process = itFinished->second;
         }
     }
-}
 
-
-
-void readProcess(const std::string& command) {
-
-    std::string processName = command.substr(10);
-
-    auto it = scheduler.runningProcesses.find(processName);
-    if (it != scheduler.runningProcesses.end()) {
-        auto process = it->second;
+    if (process) {
+        system("cls");
         std::cout << "Attached to process: " << processName << "\n";
 
+        // Immediately print "process-smi" info once before accepting input
+        auto logs = process->getLogs();
+        std::cout << "Process name: " << processName << "\n";
+        std::cout << "ID: " << process->getId() << "\n";
+        std::cout << "Logs:\n";
+        for (const auto& log : logs) {
+            std::cout << log << "\n";
+        }
+        if (process->getCurrentLine() == process->getTotalLines()) {
+            std::cout << "Finished!\n";
+        }
+        else {
+            std::cout << "Instruction: " << process->getCurrentLine()
+                << " / " << process->getTotalLines() << "\n";
+        }
+
+        // Input loop
         while (true) {
             std::cout << "(" << processName << ")> ";
             std::string subCommand;
@@ -119,14 +97,13 @@ void readProcess(const std::string& command) {
             if (subCommand == "process-smi") {
                 auto logs = process->getLogs();
                 std::cout << "Process name: " << processName << "\n";
-                std::cout << "Assigned core: " << process->getAssignedCore() << "\n";               
+                std::cout << "ID: " << process->getId() << "\n";
                 std::cout << "Logs:\n";
                 for (const auto& log : logs) {
                     std::cout << log << "\n";
                 }
-
                 if (process->getCurrentLine() == process->getTotalLines()) {
-                    std::cout << "Finished!\n";
+                    std::cout << "\nFinished!\n";
                 }
                 else {
                     std::cout << "Instruction: " << process->getCurrentLine() << " / " << process->getTotalLines() << "\n";
@@ -142,9 +119,45 @@ void readProcess(const std::string& command) {
         }
     }
     else {
+        std::cout << "Process " << processName << " not found.\n";
+    }
+}
+
+
+
+
+void reattachToProcess(const std::string& command) {
+    std::string processName = command.substr(10); // skip "screen -r "
+    auto it = scheduler.runningProcesses.find(processName);
+    if (it != scheduler.runningProcesses.end()) {
+        auto process = it->second;
+        system("cls");
+        std::cout << "Re-attached to process: " << processName << "\n";
+
+        // Print the same details as "process-smi"
+        auto logs = process->getLogs();
+        std::cout << "Process name: " << processName << "\n";
+        std::cout << "ID: " << process->getId() << "\n";
+        std::cout << "Logs:\n";
+        for (const auto& log : logs) {
+            std::cout << log << "\n";
+        }
+        if (process->getCurrentLine() == process->getTotalLines()) {
+            std::cout <<"\nFinished!\n";
+        }
+        else {
+            std::cout << "Instruction: " << process->getCurrentLine() << " / " << process->getTotalLines() << "\n";
+        }
+
+        // Immediately return to main menu
+    }
+    else {
         std::cout << "Process " << processName << " not found or has finished.\n";
     }
 }
+
+
+
 
 
 //A main menu console for recognizing the following commands : 
@@ -193,15 +206,15 @@ void enterMainLoop() {
             }
             else if (command == "exit") {
                 std::cout << "Exit command recognized. Closing application.\n";
+                scheduler.stop(); // Ensure the scheduler is stopped before exiting
                 break;
             }
-            else if (command.rfind("screen -s ", 0) == 0) { // "Start Process"
-                startProcess(command);
+            else if (command.rfind("screen -s ", 0) == 0) {
+                attachToProcess(command);
 				clearScreen();
             }
-            else if (command.rfind("screen -r ", 0) == 0) { // "Read Process"
-                readProcess(command);
-                clearScreen();
+            else if (command.rfind("screen -r ", 0) == 0) { 
+                reattachToProcess(command);
             }
             else if (command == "screen -ls") { // "List all processes"
                 scheduler.printStatus();

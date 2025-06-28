@@ -8,9 +8,10 @@
 
 #include <algorithm>
 
-Process::Process(const std::string& name, const std::vector<Instruction>& instructions)
-    : name(name), instructions(instructions), currentLine(0), assignedCore(-1) {
+Process::Process(int id, const std::string& name, const std::vector<Instruction>& instructions)
+    : id(id), name(name), instructions(instructions), currentLine(0), assignedCore(-1) {
 }
+
 
 std::string Process::getTimestamp() const {
     auto now = std::chrono::system_clock::now();
@@ -97,8 +98,8 @@ void Process::executeInstruction(const Instruction& ins) {
             std::this_thread::sleep_for(std::chrono::milliseconds(std::stoi(ins.args[0]) * 10));
         }
         break;
-
-    /*case InstructionType::FOR:
+    
+    case InstructionType::FOR:
         entry << "FOR: repeat " << ins.repeatCount << " times";
         logs.push_back(entry.str());
         for (int i = 0; i < ins.repeatCount; ++i) {
@@ -106,13 +107,13 @@ void Process::executeInstruction(const Instruction& ins) {
                 executeInstruction(subIns);
             }
         }
-        break;*/
+        break;
+
 
     default:
         break;
     }
 }
-
 
 // Retrieves the numeric value of an argument, checking memory first; otherwise converts string to integer.
 uint16_t Process::getValue(const std::string& arg) {
@@ -124,4 +125,5 @@ std::string Process::getName() const { return name; }
 int Process::getAssignedCore() const { return assignedCore; }
 int Process::getCurrentLine() const { return currentLine; }
 int Process::getTotalLines() const { return static_cast<int>(instructions.size()); }
+int Process::getId() const { return id; }
 

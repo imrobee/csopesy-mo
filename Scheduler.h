@@ -22,12 +22,15 @@ public:
     void writeStatusToFile();
     void viewConfig();
     void createManualProcess(const std::string& processName);
-
+    
 
     std::map<std::string, std::shared_ptr<Process>> runningProcesses;
     std::map<std::string, std::shared_ptr<Process>> finishedProcesses;
 
 private:
+    int nextProcessId = 1; 
+
+
     int numCores;
     std::string schedulerType;
     int quantumCycles;
