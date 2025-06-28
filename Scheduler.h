@@ -53,6 +53,6 @@ private:
     std::mutex queueMutex;
     std::condition_variable cv;
 
-    std::vector<Instruction> generateDummyInstructions(int count);
+    std::vector<Instruction> generateDummyInstructions(int count, int depth=0);
 
 };

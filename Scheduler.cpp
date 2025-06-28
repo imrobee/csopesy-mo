@@ -101,12 +101,12 @@ void Scheduler::stop() {
 
 
 
-std::vector<Instruction> Scheduler::generateDummyInstructions(int count) {
+std::vector<Instruction> Scheduler::generateDummyInstructions(int count, int depth) {
     std::vector<Instruction> instructions;
+	const int maxDepth = 3; // (depth=the number of nested for loops)
 
-    //should b able to randomly select an instruction  
     for (int i = 0; i < count; ++i) {
-        int choice = rand() % 5;
+        int choice = rand() % 6;
 
         switch (choice) {
         case 0: // PRINT
@@ -124,21 +124,31 @@ std::vector<Instruction> Scheduler::generateDummyInstructions(int count) {
         case 4: // SLEEP
             instructions.emplace_back(InstructionType::SLEEP, std::vector<std::string>{"1"});
             break;
-        //case 5: { // FOR loop
-        //    int repeats = 2 + rand() % 3; // repeat 2–4 times
-        //    int bodySize = 2 + rand() % 3; // body has 2–4 instructions
-        //    auto body = generateDummyInstructions(bodySize);
-        //    Instruction forIns(InstructionType::FOR);
-        //    forIns.repeatCount = repeats;
-        //    forIns.body = body;
-        //    instructions.push_back(forIns);
-        //    break;
-        //}
+        case 5: { // FOR loop
+            if (depth < maxDepth) {
+                int repeats = 2 + rand() % 3;   // repeat 2–4 times (repeats=the number of times for loop will repeat)
+                int bodySize = 2 + rand() % 3;  // body has 2–4 instructions (body=the number of instructions in the for loop)
+                auto body = generateDummyInstructions(bodySize, depth + 1);
+                Instruction forIns(InstructionType::FOR);
+                forIns.repeatCount = repeats;
+                forIns.body = body;
+                instructions.push_back(forIns);
+            }
+            else {
+                // depth limit reached, so just do print
+                instructions.emplace_back(InstructionType::PRINT);
+            }
+            break;
+        default:
+            instructions.emplace_back(InstructionType::PRINT);
+            break;
+        }
         }
     }
 
     return instructions;
 }
+
 
 void Scheduler::dispatcher() {
     int cpuCycles = 0;

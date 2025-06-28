@@ -95,14 +95,18 @@ void Process::executeInstruction(const Instruction& ins) {
         }
         break;
     case InstructionType::FOR:
-        entry << "FOR: repeat " << ins.repeatCount << " times";
+        entry << "FOR: repeat " << ins.repeatCount << " times {";
         logs.push_back(entry.str());
         for (int i = 0; i < ins.repeatCount; ++i) {
+            logs.push_back("  [FOR iteration " + std::to_string(i + 1) + "]");
             for (const auto& subIns : ins.body) {
                 executeInstruction(subIns);
             }
         }
-        return; // skip pushing below since already pushed above
+        logs.push_back("  [FOR loop ended] };");
+        return;
+
+
     default:
         break;
     }
