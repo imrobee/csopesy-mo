@@ -86,9 +86,9 @@ RR 4
 P1 0 5
 P2 1 3
 P3 2 8
+
 📊 Output
 For each process, display:
-
 - Process ID
 - Arrival Time
 - Burst Time
