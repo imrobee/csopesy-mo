@@ -25,7 +25,6 @@ A command‑line CPU scheduling simulation implemented in C, supporting the foll
 
 - GCC (C compiler)
 - GNU Make
-- (Optional) `diff`, `gprof` for profiling and test validation
 
 ---
 
