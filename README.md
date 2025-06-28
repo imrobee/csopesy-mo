@@ -36,10 +36,12 @@ A command‑line CPU scheduling simulation implemented in C, supporting the foll
    ```bash
    git clone https://github.com/imrobee/csopesy-mo.git
    cd csopesy-mo
+   ```
 2. Build the release version:
 
+```bash
 make release
-Executable is generated at build/scheduler or build/a.out
+```
 
 3. Clean artifacts:
 
