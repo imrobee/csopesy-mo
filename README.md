@@ -36,16 +36,13 @@ A command‑line CPU scheduling simulation implemented in C, supporting the foll
    ```bash
    git clone https://github.com/imrobee/csopesy-mo.git
    cd csopesy-mo
-Build the release version:
+2. Build the release version:
 
 make release
 Executable is generated at build/scheduler or build/a.out
 
-Clean artifacts:
+3. Clean artifacts:
 
-bash
-Copy
-Edit
 make clean
 ▶️ Usage
 The scheduler reads input from stdin. Use input redirection:
@@ -92,31 +89,26 @@ P3 2 8
 📊 Output
 For each process, display:
 
-Process ID
-
-Arrival Time
-
-Burst Time
-
-Completion Time
-
-Turnaround Time
-
-Waiting Time
+- Process ID
+- Arrival Time
+- Burst Time
+- Completion Time
+- Turnaround Time
+- Waiting Time
 
 Also show average turnaround time and waiting time at the end.
 
 📝 Algorithms
-FCFS – schedules processes in order of arrival.
+- FCFS – schedules processes in order of arrival.
 
-SJF – picks the job with shortest burst time (non-preemptive).
+- SJF – picks the job with shortest burst time (non-preemptive).
 
-SRTF – preemptive variant: switches to shortest remaining job.
+- SRTF – preemptive variant: switches to shortest remaining job.
 
-RR – cycles through processes in time slices (quantum).
+- RR – cycles through processes in time slices (quantum).
 
 📌 Authors & Contributors
-Daniel Gavrie Clemente
-Dominique Angelo Roque
-Felix Melford Mangawang
-Jan Robee Feliciano
+- Daniel Gavrie Clemente
+- Dominique Angelo Roque
+- Felix Melford Mangawang
+- Jan Robee Feliciano
