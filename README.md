@@ -38,9 +38,6 @@ A command‑line CPU scheduling simulation implemented in C, supporting the foll
    cd csopesy-mo
 Build the release version:
 
-bash
-Copy
-Edit
 make release
 Executable is generated at build/scheduler or build/a.out
 
