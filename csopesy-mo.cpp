@@ -54,74 +54,79 @@ void stopScheduler() {
 }
 
 void attachToProcess(const std::string& command) {
-    std::string processName = command.substr(10); // skip "screen -s "
+    std::string processName = command.substr(10);
 
+    // Create the manual process first
+    scheduler.createManualProcess(processName);
+
+    // Wait up to 1 sec for the process to appear
     std::shared_ptr<Process> process = nullptr;
-    auto itRunning = scheduler.runningProcesses.find(processName);
-    if (itRunning != scheduler.runningProcesses.end()) {
-        process = itRunning->second;
+    const int maxWaitMs = 1000;
+    int waited = 0;
+    const int step = 50;
+    while (waited < maxWaitMs) {
+        process = scheduler.findProcessByName(processName);
+        if (process) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(step));
+        waited += step;
+    }
+
+    if (!process) {
+        std::cout << "Failed to create or attach to process " << processName << ".\n";
+        return;
+    }
+
+    // Clear screen & show process info
+    system("cls");
+    std::cout << "Attached to process: " << processName << "\n";
+    auto logs = process->getLogs();
+    std::cout << "Process name: " << processName << "\n";
+    std::cout << "ID: " << process->getId() << "\n";
+    std::cout << "Logs:\n";
+    for (const auto& log : logs) {
+        std::cout << log << "\n";
+    }
+    if (process->getCurrentLine() == process->getTotalLines()) {
+        std::cout << "Finished!\n";
     }
     else {
-        auto itFinished = scheduler.finishedProcesses.find(processName);
-        if (itFinished != scheduler.finishedProcesses.end()) {
-            process = itFinished->second;
-        }
+        std::cout << "Instruction: " << process->getCurrentLine()
+            << " / " << process->getTotalLines() << "\n";
     }
 
-    if (process) {
-        system("cls");
-        std::cout << "Attached to process: " << processName << "\n";
+    // Input loop
+    while (true) {
+        std::cout << "(" << processName << ")> ";
+        std::string subCommand;
+        std::getline(std::cin, subCommand);
 
-        // Immediately print "process-smi" info once before accepting input
-        auto logs = process->getLogs();
-        std::cout << "Process name: " << processName << "\n";
-        std::cout << "ID: " << process->getId() << "\n";
-        std::cout << "Logs:\n";
-        for (const auto& log : logs) {
-            std::cout << log << "\n";
-        }
-        if (process->getCurrentLine() == process->getTotalLines()) {
-            std::cout << "Finished!\n";
-        }
-        else {
-            std::cout << "Instruction: " << process->getCurrentLine()
-                << " / " << process->getTotalLines() << "\n";
-        }
-
-        // Input loop
-        while (true) {
-            std::cout << "(" << processName << ")> ";
-            std::string subCommand;
-            std::getline(std::cin, subCommand);
-
-            if (subCommand == "process-smi") {
-                auto logs = process->getLogs();
-                std::cout << "Process name: " << processName << "\n";
-                std::cout << "ID: " << process->getId() << "\n";
-                std::cout << "Logs:\n";
-                for (const auto& log : logs) {
-                    std::cout << log << "\n";
-                }
-                if (process->getCurrentLine() == process->getTotalLines()) {
-                    std::cout << "\nFinished!\n";
-                }
-                else {
-                    std::cout << "Instruction: " << process->getCurrentLine() << " / " << process->getTotalLines() << "\n";
-                }
+        if (subCommand == "process-smi") {
+            auto logs = process->getLogs();
+            std::cout << "Process name: " << processName << "\n";
+            std::cout << "ID: " << process->getId() << "\n";
+            std::cout << "Logs:\n";
+            for (const auto& log : logs) {
+                std::cout << log << "\n";
             }
-            else if (subCommand == "exit") {
-                std::cout << "Returning to main menu...\n";
-                break;
+            if (process->getCurrentLine() == process->getTotalLines()) {
+                std::cout << "\nFinished!\n";
             }
             else {
-                std::cout << "Unknown command inside process screen.\n";
+                std::cout << "Instruction: " << process->getCurrentLine()
+                    << " / " << process->getTotalLines() << "\n";
             }
         }
-    }
-    else {
-        std::cout << "Process " << processName << " not found.\n";
+        else if (subCommand == "exit") {
+            std::cout << "Returning to main menu...\n";
+            break;
+        }
+        else {
+            std::cout << "Unknown command inside process screen.\n";
+        }
     }
 }
+
+
 
 
 

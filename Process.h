@@ -18,15 +18,25 @@ public:
     int getId() const;
 
     std::vector<std::string> getLogs() const { return logs; }
-private:
-    std::vector<std::string> logs;
 
+    bool isFinished() const {
+        return currentLine >= instructions.size();
+    }
+
+
+
+private:
+
+    std::vector<std::string> logs;
+    std::string creationTimestamp;
+    std::string generateTimestamp() const;
     std::string name;
     int id;
     std::vector<Instruction> instructions;
     std::unordered_map<std::string, uint16_t> memory;
     int currentLine;
     int assignedCore;
+	std::string timestamp;
 
     void executeInstruction(const Instruction& ins);
     uint16_t getValue(const std::string& arg);

@@ -14,7 +14,7 @@ class Scheduler {
 public:
     Scheduler();
     void initialize(const std::string& configPath);
-    void start();           
+    void start(bool withDispatcher=true);           
     void stop();          
     void dispatcher();       
     void coreWorker(int coreId);
@@ -26,6 +26,7 @@ public:
 
     std::map<std::string, std::shared_ptr<Process>> runningProcesses;
     std::map<std::string, std::shared_ptr<Process>> finishedProcesses;
+    std::shared_ptr<Process> findProcessByName(const std::string& processName);
 
 private:
     int nextProcessId = 1; 

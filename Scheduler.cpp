@@ -5,7 +5,7 @@
 #include <iomanip>
 #include <chrono>
 #include <ctime>
-#include <cstdlib> // for rand()
+#include <cstdlib>
 
 Scheduler::Scheduler() : numCores(4),
 schedulerType("rr"),
@@ -65,19 +65,21 @@ void Scheduler::initialize(const std::string& configPath) {
 }
 
 // Starts the scheduler: spawns core worker threads and the dispatcher thread.
-void Scheduler::start() {
+void Scheduler::start(bool withDispatcher) {
     running = true;
-
     coreAvailable.resize(numCores, true);
 
-    // Start core worker threads
     for (int i = 0; i < numCores; ++i) {
         cores.emplace_back(&Scheduler::coreWorker, this, i);
     }
 
-    // Start dispatcher thread (responsible for pushing dummy processes at batchFrequency)
-    dispatcherThread = std::thread(&Scheduler::dispatcher, this);
+    if (withDispatcher) {
+        dispatcherThread = std::thread(&Scheduler::dispatcher, this);
+    }
+
 }
+
+
 
 void Scheduler::stop() {
     running = false;
@@ -138,20 +140,18 @@ std::vector<Instruction> Scheduler::generateDummyInstructions(int count) {
     return instructions;
 }
 
-// Periodically creates new dummy processes at batchFrequency and adds them to the queue.
 void Scheduler::dispatcher() {
-    int processCounter = 0;
+    int cpuCycles = 0;
+
 
     while (running) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10)); // Simulate a CPU tick
+        cpuCycles++;
 
-        // Only add a process every batchFrequency ticks
-        if (processCounter % batchFrequency == 0) {
-            int pid = nextProcessId++;  // increment once
+        if (cpuCycles % batchFrequency == 0) {
+            // Add one process on every batchFrequency tick
+            int pid = nextProcessId++;
             std::ostringstream name;
             name << "Process_" << std::setw(2) << std::setfill('0') << pid;
-
-
 
             int numInstructions = minInstructions;
             if (maxInstructions > minInstructions) {
@@ -161,7 +161,6 @@ void Scheduler::dispatcher() {
             auto instructions = generateDummyInstructions(numInstructions);
             auto process = std::make_shared<Process>(pid, name.str(), instructions);
 
-
             {
                 std::lock_guard<std::mutex> lock(queueMutex);
                 readyQueue.push(process);
@@ -169,9 +168,10 @@ void Scheduler::dispatcher() {
             cv.notify_all();
         }
 
-        ++processCounter;
+
     }
 }
+
 
 // Continuously picks processes from the queue and runs them on the assigned core.
 void Scheduler::coreWorker(int coreId) {
@@ -181,8 +181,9 @@ void Scheduler::coreWorker(int coreId) {
         {
             std::unique_lock<std::mutex> lock(queueMutex);
             cv.wait(lock, [&] {
-                return !readyQueue.empty() || !running;
+                return (!readyQueue.empty() && coreAvailable[coreId]) || !running;
                 });
+
 
             if (!running) return;
 
@@ -191,6 +192,7 @@ void Scheduler::coreWorker(int coreId) {
                 if (schedulerType == "fcfs" or schedulerType == "rr") { //Round Robin is just fcfs with quantum cycles*
                     proc = readyQueue.front();
                     readyQueue.pop();
+                    cv.notify_all();
                 }
                 else {
                     std::cerr << "Unsupported scheduler: " << schedulerType << "\n";
@@ -214,6 +216,7 @@ void Scheduler::coreWorker(int coreId) {
                 finishedProcesses[proc->getName()] = proc;
                 runningProcesses.erase(proc->getName());
                 coreAvailable[coreId] = true;
+                cv.notify_all();
             }
         }
     }
@@ -295,20 +298,39 @@ void Scheduler::viewConfig() {
     std::cout << "Delay Per Execution: " << delayPerExecution << "\n";
 }
 
-//void Scheduler::createManualProcess(const std::string& processName) {
-//    int numInstructions = minInstructions;
-//    if (maxInstructions > minInstructions) {
-//        numInstructions += rand() % (maxInstructions - minInstructions + 1);
-//    }
-//
-//    auto instructions = generateDummyInstructions(numInstructions);
-//    auto process = std::make_shared<Process>(processName, instructions);
-//
-//    {
-//        std::lock_guard<std::mutex> lock(queueMutex);
-//        readyQueue.push(process);
-//    }
-//    cv.notify_all();
-//
-//    std::cout << "Process " << processName << " created and added to the queue.\n";
-//}
+void Scheduler::createManualProcess(const std::string& processName) {
+    int numInstructions = minInstructions;
+    if (maxInstructions > minInstructions) {
+        numInstructions += rand() % (maxInstructions - minInstructions + 1);
+    }
+
+    int pid = nextProcessId++;
+    auto instructions = generateDummyInstructions(numInstructions);
+    auto process = std::make_shared<Process>(pid, processName, instructions);
+
+    {
+        std::lock_guard<std::mutex> lock(queueMutex);
+        readyQueue.push(process);
+    }
+    cv.notify_all();
+
+    std::cout << "Process " << processName << " created and added to the queue.\n";
+
+    // Start the cores only (without dispatcher) if not already running
+    if (!running) {
+        start(false);
+    }
+}
+
+std::shared_ptr<Process> Scheduler::findProcessByName(const std::string& processName) {
+    std::lock_guard<std::mutex> lock(queueMutex);
+    auto itRunning = runningProcesses.find(processName);
+    if (itRunning != runningProcesses.end()) {
+        return itRunning->second;
+    }
+    auto itFinished = finishedProcesses.find(processName);
+    if (itFinished != finishedProcesses.end()) {
+        return itFinished->second;
+    }
+    return nullptr;
+}
