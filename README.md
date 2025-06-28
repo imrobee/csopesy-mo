@@ -29,88 +29,114 @@ A command‑line CPU scheduling simulation implemented in C, supporting the foll
 
 ---
 
-## 🔧 Build & Run
-
-1. Clone the repo:
-
-   ```bash
-   git clone https://github.com/imrobee/csopesy-mo.git
-   cd csopesy-mo
-   ```
-2. Build the release version:
-
-```bash
-make release
-```
-
-3. Clean artifacts:
-
-make clean
-▶️ Usage
-The scheduler reads input from stdin. Use input redirection:
-
-./build/scheduler < testcases/input1.txt
-Supported commands
-make bench — compiles with timing info on execution
-
-make bench-prof — compiles with gprof profiling flags
-
-Test automation
-Run tests via:
-
-./testscript.sh
-This script:
-
-Prompts you to choose an algorithm
-
-Runs all testcases and compares outputs
-
-Requires diff to highlight mismatches
-
-🧠 Input Format
-Each test case must specify:
-
-<algorithm> <quantum>
-< n >
-<pid> <arrival_time> <burst_time>
-...
-<algorithm>: FCFS, SJF, SRTF, or RR
-
-<quantum>: a positive integer (only relevant for RR)
-
-<n>: number of processes
-
-Each line: process ID, arrival time, and burst time
-
-Example
-RR 4
-3
-P1 0 5
-P2 1 3
-P3 2 8
-
-📊 Output
-For each process, display:
-- Process ID
-- Arrival Time
-- Burst Time
-- Completion Time
-- Turnaround Time
-- Waiting Time
-
-Also show average turnaround time and waiting time at the end.
-
-📝 Algorithms
-- FCFS – schedules processes in order of arrival.
-
-- SJF – picks the job with shortest burst time (non-preemptive).
-
-- SRTF – preemptive variant: switches to shortest remaining job.
-
-- RR – cycles through processes in time slices (quantum).
-
 📌 Authors & Contributors
 - Daniel Gavrie Clemente
 - Dominique Angelo Roque
 - Felix Melford Mangawang
 - Jan Robee Feliciano
+
+
+## Getting Started with the Emulator
+
+1. Download the files from this repository or clone the repository to your machine
+2. Compile the program
+3. Run the application
+
+### Usage
+
+Once the program is running, you can use the following commands to interact with the emulator and process scheduler:
+
+-   **`initialize`**  
+    Initializes the system and prepares the environment for further operations. This must be run before starting any session or scheduler test.
+
+    ```bash
+     initialize
+    ```
+
+    Output:  
+    ` Processor configuration initialized.`
+
+-   **`screen -s <session_name>`**  
+    Starts a new session with the given name.
+
+    ```bash
+     screen -s example_session
+    ```
+
+-   **`screen -r <session_name>`**  
+    Reattaches to an existing session.
+
+    ```bash
+     screen -r example_session
+    ```
+
+    Output:  
+    Reattaches and switches to the session `example_session`.
+
+-   **`screen -ls`**  
+    Lists all active sessions.
+
+    ```bash
+     screen -ls
+    ```
+
+-   **`scheduler-test`**  
+    Starts the creation of dummy processes for testing the scheduling functionality.
+
+    ```bash
+     scheduler-test
+    ```
+
+    Output:  
+    ` Creating dummy processes`
+
+-   **`scheduler-stop`**  
+    Stops the creation of dummy processes.
+
+    ```bash
+     scheduler-stop
+    ```
+
+    Output:  
+    ` Stopping creation of dummy processes`
+
+-   **`report-util`**  
+    Generates and displays a utilization report of the system.
+
+    ```bash
+     report-util
+    ```
+
+-   **`clear`**  
+    Clears the screen and re-displays the header.
+
+    ```bash
+     clear
+    ```
+
+-   **`exit`**  
+    Exits the current session if inside one, or exits the emulator if not in a session.
+
+    ```bash
+     exit
+    ```
+
+    Output:  
+    If in a session: ` Exiting session...`  
+    If outside a session: ` Exiting emulator...`
+
+-   **`help`**  
+    Displays the list of available commands.
+
+    ```bash
+     help
+    ```
+
+-   **`process-smi`**
+    Prints simple information of the process. Applicable when attached to a process.
+
+    ```bash
+     process-smi
+    ```
+
+---
