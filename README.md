@@ -30,7 +30,7 @@ A command‑line CPU scheduling simulation implemented in C, supporting the foll
 
 📌 Authors & Contributors
 - Daniel Gavrie Clemente
-- Dominique Angelo Roque
+- Dominic Angelo Roque
 - Felix Melford Mangawang
 - Jan Robee Feliciano
 
